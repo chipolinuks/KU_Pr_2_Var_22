@@ -1,0 +1,8 @@
+{
+    "package_name": "curl",
+    "repo_url": "https://pkgs.alpinelinux.org/packages",
+    "test_mode": false,
+    "output_image": "deps.png",
+    "ascii_tree": false,
+    "filter_substring": ""
+}
