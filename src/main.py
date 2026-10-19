@@ -2,11 +2,12 @@
 
 import json
 import sys
+import urllib.error
 from pathlib import Path
 
+from src.fetcher import download_apkindex, parse_apkindex
 
 CONFIG_PATH_DEFAULT = "config.json"
-URL_SCHEMES = ("http://", "https://")
 
 
 def load_config(path: str) -> dict:
@@ -39,7 +40,7 @@ def validate_repo_url(value: object) -> str:
             "repo_url должен быть непустой строкой"
         )
     value = value.strip()
-    is_url = value.startswith(URL_SCHEMES)
+    is_url = value.startswith(("http://", "https://"))
     is_file = Path(value).exists()
     if not is_url and not is_file:
         raise ValueError(
@@ -126,6 +127,25 @@ def print_config(config: dict) -> None:
     print("===============================")
 
 
+def run_stage2(config: dict) -> None:
+    """Выполняет сбор и вывод прямых зависимостей пакета"""
+    print("\n=== Сбор данных о зависимостях ===")
+    try:
+        data = download_apkindex(config["repo_url"])
+        deps = parse_apkindex(data, config["package_name"])
+
+        if deps:
+            print(f"Прямые зависимости пакета '{config['package_name']}':")
+            for dep in deps:
+                print(f"  - {dep}")
+        else:
+            print(f"Пакет '{config['package_name']}' не найден или "
+                  "не имеет зависимостей")
+    except urllib.error.URLError as e:
+        print(f"Ошибка сети при скачивании: {e}", file=sys.stderr)
+        raise
+
+
 def main() -> int:
     """Точка входа в приложение"""
     config_path = (
@@ -136,11 +156,12 @@ def main() -> int:
         raw_config = load_config(config_path)
         config = validate_config(raw_config)
         print_config(config)
+        run_stage2(config)
         return 0
     except (FileNotFoundError, ValueError) as e:
-        print(
-            f"Ошибка конфигурации: {e}", file=sys.stderr
-        )
+        print(f"Ошибка конфигурации: {e}", file=sys.stderr)
+        return 1
+    except urllib.error.URLError:
         return 1
 
 
