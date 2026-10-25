@@ -27,3 +27,19 @@ htmlcov/
 # ОС
 .DS_Store
 Thumbs.db
+
+# Настройки редактора кода
+.idea/
+.vscode/
+*.iml
+
+# Артефакты, оставшиеся после работы с APKINDEX
+APKINDEX
+APKINDEX.tar.gz
+DESCRIPTION
+.SIGN.RSA.*
+.SIGN_RSA.*
+
+# Виртуальное окружение
+.venv/
+venv/
