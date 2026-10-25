@@ -5,13 +5,13 @@ import sys
 import urllib.error
 from pathlib import Path
 
-from src.fetcher import download_apkindex, parse_apkindex
+from src.fetcher import download_apkindex
 
-CONFIG_PATH_DEFAULT = "config.json"
+CONFIG_PATH_DEFAULT = "configs/config_simple.json"
 
 
 def load_config(path: str) -> dict:
-    """Загружает конфигурацию из JSON-файла"""
+    """Загружает конфигурацию из JSON-ls-файла"""
     config_file = Path(path)
     if not config_file.exists():
         raise FileNotFoundError(
@@ -127,23 +127,102 @@ def print_config(config: dict) -> None:
     print("===============================")
 
 
-def run_stage2(config: dict) -> None:
-    """Выполняет сбор и вывод прямых зависимостей пакета"""
-    print("\n=== Сбор данных о зависимостях ===")
-    try:
-        data = download_apkindex(config["repo_url"])
-        deps = parse_apkindex(data, config["package_name"])
+def parse_all_packages(data: str) -> dict:
+    """Парсит весь APKINDEX в словарь всех пакетов и их зависимостей"""
+    packages = {}
+    current_pkg = None
+    for line in data.splitlines():
+        if line.startswith("P:"):
+            current_pkg = line[2:].strip()
+            packages[current_pkg] = []
+        elif line.startswith("D:") and current_pkg:
+            deps_str = line[2:].strip()
+            deps = []
+            for dep in deps_str.split():
+                name = dep.split("=")[0]
+                if name.startswith("so:"):
+                    name = name[3:]
+                deps.append(name)
+            packages[current_pkg] = deps
+    return packages
 
+
+def load_test_repo(path: str) -> dict:
+    """Загружает тестовый репозиторий из JSON-файла"""
+    repo_file = Path(path)
+    if not repo_file.exists():
+        raise FileNotFoundError(
+            f"Тестовый файл не найден: {path}"
+        )
+    try:
+        with repo_file.open("r", encoding="utf-8") as f:
+            return json.load(f)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Ошибка разбора JSON: {e}") from e
+
+
+def build_dependency_graph(
+    package_name: str,
+    packages: dict,
+    filter_sub: str = "",
+) -> dict:
+    """Строит граф зависимостей с помощью DFS с рекурсией"""
+    graph = {}
+    visited = set()
+
+    def dfs(pkg: str) -> None:
+        """Рекурсивный обход в глубину"""
+        if pkg in visited:
+            return
+        visited.add(pkg)
+
+        deps = packages.get(pkg, [])
+        filtered_deps = []
+        for dep in deps:
+            if filter_sub and filter_sub in dep:
+                continue
+            filtered_deps.append(dep)
+
+        graph[pkg] = filtered_deps
+
+        for dep in filtered_deps:
+            if dep not in visited and dep in packages:
+                dfs(dep)
+
+    dfs(package_name)
+    return graph
+
+
+def print_graph(graph: dict) -> None:
+    """Выводит граф зависимостей на экран"""
+    print("\n=== Граф зависимостей ===")
+    for pkg, deps in graph.items():
         if deps:
-            print(f"Прямые зависимости пакета '{config['package_name']}':")
-            for dep in deps:
-                print(f"  - {dep}")
+            deps_str = ", ".join(deps)
+            print(f"{pkg} -> {deps_str}")
         else:
-            print(f"Пакет '{config['package_name']}' не найден или "
-                  "не имеет зависимостей")
-    except urllib.error.URLError as e:
-        print(f"Ошибка сети при скачивании: {e}", file=sys.stderr)
-        raise
+            print(f"{pkg} -> (нет зависимостей)")
+    print("=========================")
+
+
+def run_stage3(config: dict) -> None:
+    """Выполняет построение графа зависимостей (Этап 3)"""
+    print("\n=== Построение графа зависимостей ===")
+    repo_url = config["repo_url"]
+    package_name = config["package_name"]
+    filter_sub = config["filter_substring"]
+    test_mode = config["test_mode"]
+
+    if test_mode:
+        packages = load_test_repo(repo_url)
+    else:
+        data = download_apkindex(repo_url)
+        packages = parse_all_packages(data)
+
+    graph = build_dependency_graph(
+        package_name, packages, filter_sub
+    )
+    print_graph(graph)
 
 
 def main() -> int:
@@ -156,7 +235,7 @@ def main() -> int:
         raw_config = load_config(config_path)
         config = validate_config(raw_config)
         print_config(config)
-        run_stage2(config)
+        run_stage3(config)
         return 0
     except (FileNotFoundError, ValueError) as e:
         print(f"Ошибка конфигурации: {e}", file=sys.stderr)

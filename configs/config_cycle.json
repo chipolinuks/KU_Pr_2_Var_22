@@ -1,0 +1,8 @@
+{
+    "package_name": "A",
+    "repo_url": "tests/test_repo_cycle.json",
+    "test_mode": true,
+    "output_image": "deps_cycle.png",
+    "ascii_tree": false,
+    "filter_substring": ""
+}

@@ -17,6 +17,11 @@ CLI-инструмент для визуализации графа зависи
 - **Этап 2**: сбор данных о прямых зависимостях из
   официального индекса репозитория Alpine (APKINDEX) без
   использования сторонних библиотек.
+- **Этап 3**: построение графа зависимостей с учетом 
+  транзитивности (алгоритм DFS с рекурсией), корректная 
+  обработка циклических зависимостей, фильтрация пакетов по 
+  заданной подстроке и поддержка тестового режима с кастомными 
+  JSON-графами (пакеты обозначены большими латинскими буквами).
 
 ## Описание настроек
 
@@ -34,7 +39,7 @@ CLI-инструмент для визуализации графа зависи
 
 ## Описание функций
 
-Модуль `src/main.py`:
+**Модуль `src/main.py`:**
 - `load_config(path)` — загружает JSON-файл конфигурации
 - `validate_config(config)` — валидирует все параметры
 - `validate_package_name(value)` — проверяет имя пакета
@@ -43,10 +48,14 @@ CLI-инструмент для визуализации графа зависи
 - `validate_output_image(value)` — проверяет имя файла
 - `validate_filter(value)` — проверяет подстроку фильтра
 - `print_config(config)` — выводит параметры в консоль
-- `run_stage2(config)` — выполняет логику второго этапа
+- `parse_all_packages(data)` — парсит весь APKINDEX в словарь
+- `load_test_repo(path)` — загружает тестовый JSON-файл репозитория
+- `build_dependency_graph(...)` — строит граф зависимостей с помощью рекурсивного DFS
+- `print_graph(graph)` — выводит граф зависимостей на экран
+- `run_stage3(config)` — выполняет логику третьего этапа
 - `main()` — точка входа в приложение
 
-Модуль `src/fetcher.py`:
+**Модуль `src/fetcher.py`:**
 - `download_apkindex(url)` — скачивает архив индекса репозитория
 - `parse_apkindex(data, package_name)` — извлекает зависимости из архива
 - `_extract_dependencies(content, package_name)` — парсит текстовый блок
@@ -56,6 +65,7 @@ CLI-инструмент для визуализации графа зависи
 Запуск приложения (универсальный способ):
 
 ```bash
-python -m src.main                 # использует config.json
-python -m src.main my_config.json  # использует указанный файл
-python -m unittest discover -s tests -v #запускает тесты
+python -m src.main configs/config_simple.json   # простой граф без циклов
+python -m src.main configs/config_cycle.json    # граф с циклическими зависимостями
+python -m src.main configs/config_filter.json   # граф с фильтрацией пакетов
+python -m unittest discover -s tests -v         # запуск всех тестов
