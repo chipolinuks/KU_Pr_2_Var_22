@@ -1,8 +1,0 @@
-{
-    "package_name": "A",
-    "repo_url": "tests/test_repo_simple.json",
-    "test_mode": true,
-    "output_image": "deps_simple.png",
-    "ascii_tree": false,
-    "filter_substring": ""
-}

@@ -5,13 +5,13 @@ import sys
 import urllib.error
 from pathlib import Path
 
-from src.fetcher import download_apkindex
+from src.fetcher import download_apkindex, get_apkindex_text
 
 CONFIG_PATH_DEFAULT = "configs/config_simple.json"
 
 
 def load_config(path: str) -> dict:
-    """Загружает конфигурацию из JSON-ls-файла"""
+    """Загружает конфигурацию из JSON-файла"""
     config_file = Path(path)
     if not config_file.exists():
         raise FileNotFoundError(
@@ -205,9 +205,38 @@ def print_graph(graph: dict) -> None:
     print("=========================")
 
 
-def run_stage3(config: dict) -> None:
-    """Выполняет построение графа зависимостей (Этап 3)"""
-    print("\n=== Построение графа зависимостей ===")
+def get_installation_order(graph: dict, start_pkg: str) -> list:
+    """Возвращает порядок установки зависимостей (топологическая сортировка)"""
+    order = []
+    visited = set()
+
+    def dfs_post_order(pkg: str) -> None:
+        """Пост-порядок: сначала зависимости, потом сам пакет"""
+        if pkg in visited:
+            return
+        visited.add(pkg)
+
+        for dep in graph.get(pkg, []):
+            if dep in graph:
+                dfs_post_order(dep)
+
+        order.append(pkg)
+
+    dfs_post_order(start_pkg)
+    return order
+
+
+def print_installation_order(order: list) -> None:
+    """Выводит порядок установки зависимостей на экран"""
+    print("\n=== Порядок установки зависимостей ===")
+    for i, pkg in enumerate(order, 1):
+        print(f"{i}. {pkg}")
+    print("======================================")
+
+
+def run_stage4(config: dict) -> None:
+    """Выполняет построение графа и вывод порядка установки (Этап 4)"""
+    print("\n=== Этап 4: Дополнительные операции ===")
     repo_url = config["repo_url"]
     package_name = config["package_name"]
     filter_sub = config["filter_substring"]
@@ -216,13 +245,17 @@ def run_stage3(config: dict) -> None:
     if test_mode:
         packages = load_test_repo(repo_url)
     else:
-        data = download_apkindex(repo_url)
+        data = get_apkindex_text(repo_url)
         packages = parse_all_packages(data)
 
     graph = build_dependency_graph(
         package_name, packages, filter_sub
     )
+
     print_graph(graph)
+
+    order = get_installation_order(graph, package_name)
+    print_installation_order(order)
 
 
 def main() -> int:
@@ -235,7 +268,8 @@ def main() -> int:
         raw_config = load_config(config_path)
         config = validate_config(raw_config)
         print_config(config)
-        run_stage3(config)
+        run_stage4(config)
+
         return 0
     except (FileNotFoundError, ValueError) as e:
         print(f"Ошибка конфигурации: {e}", file=sys.stderr)

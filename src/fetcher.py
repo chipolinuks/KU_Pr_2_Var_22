@@ -43,3 +43,15 @@ def _extract_dependencies(content: str, package_name: str) -> list[str]:
                 return [dep.strip() for dep in deps.split() if dep.strip()]
             return []
     return []
+
+
+def get_apkindex_text(url: str) -> str:
+    """Скачивает APKINDEX и возвращает его содержимое как строку"""
+    data = download_apkindex(url)
+    with gzip.GzipFile(fileobj=BytesIO(data)) as gz:
+        with tarfile.open(fileobj=gz, mode="r:") as tar:
+            member = tar.getmember("APKINDEX")
+            f = tar.extractfile(member)
+            if f is None:
+                raise ValueError("Не удалось извлечь файл APKINDEX")
+            return f.read().decode("utf-8")
