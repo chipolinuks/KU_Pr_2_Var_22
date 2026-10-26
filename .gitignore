@@ -40,6 +40,16 @@ DESCRIPTION
 .SIGN.RSA.*
 .SIGN_RSA.*
 
+# Сгенерированные файлы визуализации (Этап 5)
+curl_deps.png
+wget_deps.png
+git_deps.png
+graph_curl.d2
+graph_wget.d2
+graph_git.d2
+*.png
+*.d2
+
 # Виртуальное окружение
 .venv/
 venv/

@@ -3,6 +3,7 @@
 import json
 import sys
 import urllib.error
+import subprocess
 from pathlib import Path
 
 from src.fetcher import download_apkindex, get_apkindex_text
@@ -234,6 +235,104 @@ def print_installation_order(order: list) -> None:
     print("======================================")
 
 
+def generate_d2(graph: dict) -> str:
+    """Генерирует текст графа в формате D2"""
+    lines = []
+    for pkg, deps in graph.items():
+        for dep in deps:
+            lines.append(f"{pkg} -> {dep}")
+    return "\n".join(lines)
+
+
+def save_d2(d2_text: str, path: str) -> None:
+    """Сохраняет D2-текст в файл"""
+    Path(path).write_text(d2_text, encoding="utf-8")
+
+
+def convert_d2_to_png(d2_path: str, png_path: str) -> bool:
+    """Конвертирует D2-файл в PNG через D2 CLI"""
+    try:
+        subprocess.run(
+            ["d2", d2_path, png_path],
+            check=True,
+            capture_output=True,
+        )
+        print(f"PNG-изображение сохранено: {png_path}")
+        return True
+    except FileNotFoundError:
+        print("D2 CLI не найден. PNG не создан.", file=sys.stderr)
+        return False
+    except subprocess.CalledProcessError as e:
+        print(f"Ошибка D2: {e}", file=sys.stderr)
+        return False
+
+
+def _draw_tree(
+    graph: dict,
+    node: str,
+    prefix: str,
+    is_tail: bool,
+    visited: set,
+) -> None:
+    """Рекурсивно рисует узлы ASCII-дерева"""
+    connector = "└── " if is_tail else "── "
+    print(f"{prefix}{connector}{node}")
+    if node in visited or node not in graph:
+        return
+    visited.add(node)
+    children = graph.get(node, [])
+    extension = "    " if is_tail else "│   "
+    for i, child in enumerate(children):
+        _draw_tree(
+            graph, child, prefix + extension,
+            i == len(children) - 1, visited
+        )
+
+
+def print_ascii_tree(graph: dict, start_pkg: str) -> None:
+    """Выводит граф зависимостей в виде ASCII-дерева"""
+    print(f"\n=== ASCII-дерево: {start_pkg} ===")
+    print(start_pkg)
+    visited = {start_pkg}
+    deps = graph.get(start_pkg, [])
+    for i, dep in enumerate(deps):
+        _draw_tree(
+            graph, dep, "", i == len(deps) - 1, visited
+        )
+    print("=" * 40)
+
+
+def run_stage5(config: dict) -> None:
+    """Выполняет визуализацию графа (Этап 5)"""
+    print("\n=== Этап 5: Визуализация ===")
+    repo_url = config["repo_url"]
+    package_name = config["package_name"]
+    filter_sub = config["filter_substring"]
+    test_mode = config["test_mode"]
+    ascii_mode = config["ascii_tree"]
+    output_image = config["output_image"]
+
+    if test_mode:
+        packages = load_test_repo(repo_url)
+    else:
+        data = get_apkindex_text(repo_url)
+        packages = parse_all_packages(data)
+
+    graph = build_dependency_graph(
+        package_name, packages, filter_sub
+    )
+
+    d2_text = generate_d2(graph)
+    d2_path = f"graph_{package_name}.d2"
+    save_d2(d2_text, d2_path)
+    print(f"D2-файл сохранён: {d2_path}")
+
+    convert_d2_to_png(d2_path, output_image)
+
+    if ascii_mode:
+        print_ascii_tree(graph, package_name)
+
+
 def run_stage4(config: dict) -> None:
     """Выполняет построение графа и вывод порядка установки (Этап 4)"""
     print("\n=== Этап 4: Дополнительные операции ===")
@@ -268,7 +367,7 @@ def main() -> int:
         raw_config = load_config(config_path)
         config = validate_config(raw_config)
         print_config(config)
-        run_stage4(config)
+        run_stage5(config)
 
         return 0
     except (FileNotFoundError, ValueError) as e:

@@ -22,10 +22,17 @@ CLI-инструмент для визуализации графа зависи
   обработка циклических зависимостей, фильтрация пакетов по 
   заданной подстроке и поддержка тестового режима с кастомными 
   JSON-графами (пакеты обозначены большими латинскими буквами).
-- - **Этап 4**: вывод порядка загрузки (установки) зависимостей
+- **Этап 4**: вывод порядка загрузки (установки) зависимостей
   для заданного пакета на основе топологической сортировки
   (DFS в пост-порядке), а также сравнение результатов с
   реальным менеджером пакетов apk.
+- **Этап 5**: визуализация графа зависимостей — генерация
+  текстового представления на языке диаграмм D2, сохранение
+  изображения в формате PNG через D2 CLI, вывод зависимостей
+  в виде ASCII-дерева (по параметру конфигурации).
+  Демонстрация на трёх различных пакетах Alpine Linux
+  (curl, wget, git) и сравнение результатов со штатными
+  инструментами визуализации менеджера пакетов apk.
 
 ## Описание настроек
 
@@ -54,26 +61,43 @@ CLI-инструмент для визуализации графа зависи
 - `print_config(config)` — выводит параметры в консоль
 - `parse_all_packages(data)` — парсит весь APKINDEX в словарь
 - `load_test_repo(path)` — загружает тестовый JSON-файл репозитория
-- `build_dependency_graph(...)` — строит граф зависимостей с помощью рекурсивного DFS
+- `build_dependency_graph(...)` — строит граф зависимостей
+  с помощью рекурсивного DFS
 - `print_graph(graph)` — выводит граф зависимостей на экран
-- `get_installation_order(graph, start_pkg)` — возвращает порядок установки зависимостей (топологическая сортировка)
-- `print_installation_order(order)` — выводит нумерованный порядок установки
-- `run_stage4(config)` — выполняет логику четвёртого этапа
+- `get_installation_order(graph, start_pkg)` — возвращает
+  порядок установки зависимостей (топологическая сортировка)
+- `print_installation_order(order)` — выводит нумерованный
+  порядок установки
+- `generate_d2(graph)` — генерирует текстовое представление
+  графа в формате D2
+- `save_d2(d2_text, path)` — сохраняет D2-текст в файл
+- `convert_d2_to_png(d2_path, png_path)` — конвертирует
+  D2-файл в PNG через D2 CLI
+- `print_ascii_tree(graph, start_pkg)` — выводит граф
+  зависимостей в виде ASCII-дерева
+- `_draw_tree(...)` — рекурсивно рисует узлы ASCII-дерева
+- `run_stage5(config)` — выполняет логику пятого этапа
+  (визуализация)
 - `main()` — точка входа в приложение
 
 **Модуль `src/fetcher.py`:**
-- `download_apkindex(url)` — скачивает архив индекса репозитория
-- `get_apkindex_text(url)` — возвращает содержимое APKINDEX в виде строки
-- `parse_apkindex(data, package_name)` — извлекает зависимости из архива
-- `_extract_dependencies(content, package_name)` — парсит текстовый блок
+- `download_apkindex(url)` — скачивает архив APKINDEX.tar.gz
+- `get_apkindex_text(url)` — возвращает содержимое APKINDEX
+  в виде строки
+- `parse_apkindex(data, package_name)` — извлекает зависимости
+  из архива
+- `_extract_dependencies(content, package_name)` — парсит
+  текстовый блок
 
-## Сборка и запуск тестов
+## Сборка и запуск
 
-Запуск приложения (универсальный способ):
+Запуск приложения:
 
 ```bash
 python -m src.main configs/config_simple.json   # простой граф без циклов
 python -m src.main configs/config_cycle.json    # граф с циклическими зависимостями
 python -m src.main configs/config_filter.json   # граф с фильтрацией пакетов
-python -m src.main configs/config_real.json     # реальный пакет curl из Alpine
+python -m src.main configs/config_curl.json     # пакет curl + PNG + ASCII-дерево
+python -m src.main configs/config_wget.json     # пакет wget + PNG + ASCII-дерево
+python -m src.main configs/config_git.json      # пакет git + PNG + ASCII-дерево
 python -m unittest discover -s tests -v         # запуск всех тестов
